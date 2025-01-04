@@ -1,0 +1,413 @@
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ionic Tabs Example</title>
+<!-- ///////////// ionic /////////////-->
+<script type="module" src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.esm.js"></script>
+<script nomodule src="https://cdn.jsdelivr.net/npm/@ionic/core/dist/ionic/ionic.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/@ionic/core/css/ionic.bundle.css" rel="stylesheet">
+
+  <script>
+    window.Ionic = {
+      config: {
+        mode: 'ios'
+      }
+    }
+  </script>
+<!-- ///////////// Typr.js /////////////-->
+<script type="text/javascript" src="../src/Typr.js"></script>
+<script type="text/javascript" src="../src/Typr.U.js"></script>
+		
+<script type="text/javascript">
+	
+		var font;
+		var off = 0, num = 100;
+		var gid = 0;
+		var uncd = null;
+		
+		function load(path, resp)
+		{
+			var request = new XMLHttpRequest();
+			request.open("GET", path, true);
+			request.responseType = "arraybuffer";
+			request.onload = function(e){resp(e.target.response);};
+			request.send();
+		}
+		
+		function go() {  
+			load("LiberationSans-Bold.ttf",fontLoaded);  
+			
+			var node = document.body;
+			node.addEventListener("drop", onDrop, false);
+			node.addEventListener("dragenter", cancel, false);
+			node.addEventListener("dragleave", cancel, false);
+			node.addEventListener("dragover",  cancel, false);
+		}
+		function cancel(e) {  e.stopPropagation(); e.preventDefault();  }
+		
+		function onDrop(e)
+		{  
+			cancel(e);
+			var r = new FileReader();
+			r.onload = function(e) { fontLoaded(e.target.result); };
+			r.readAsArrayBuffer( e.dataTransfer.files[0] );
+		}
+		
+		function glyphCnt() {  return font.maxp.numGlyphs;  }
+		
+		function fontLoaded(resp)
+		{
+			font = Typr.parse(resp)[0];
+			console.log(font);
+			
+			
+			uncd = new Array(glyphCnt());
+			for(var i=0; i<130000; i++)  {
+				var gid = Typr.U.codeToGlyph(font, i);  
+				if(gid==0) continue;
+				if(uncd[gid]==null) uncd[gid]=[i];
+				else uncd[gid].push(i);
+			}
+			
+			off=0;  gid=0;
+			
+			drawGlyphs();  
+			drawGlyph();
+			drawWord();
+		}
+		
+		function drawGlyphs()
+		{
+			var cont = document.getElementById("glyphcont");  cont.innerHTML = "";
+			var cnv = document.createElement("canvas");  cnv.width = Math.floor(getDPR()*40);  cnv.height = Math.floor(getDPR()*60);  //scaleCnv(cnv);
+			var ctx = cnv.getContext("2d");
+			ctx.font="20px sans";
+			
+			var lim = Math.min(off+num, glyphCnt());
+			//console.log(off, lim); throw "e";
+			var scale = 32*getDPR() / font.head.unitsPerEm;
+			for(var i=off; i<lim; i++)
+			{
+				var path = Typr.U.glyphToPath(font, i);
+				
+				cnv.width = cnv.width;
+				//ctx.scale(getDPR(), getDPR());
+				ctx.translate(10*getDPR(),Math.round(36*getDPR()));  
+				
+				ctx.fillStyle = "#ff0000";
+				ctx.fillRect(0,0,cnv.width,1);
+				
+				ctx.fillStyle = "#333333";
+				ctx.fillText(i,0,20);
+				
+				ctx.scale(scale,-scale);
+				Typr.U.pathToContext(path, ctx);
+				ctx.fill();
+				
+				var img = document.createElement("img");
+				img.setAttribute("style", "width:"+(cnv.width/getDPR())+"px; height:"+(cnv.height/getDPR())+"px");
+				img.gid = i;
+				img.onclick = glyphClick;
+				img.src = cnv.toDataURL();
+				cont.appendChild(img);
+			}
+		}
+		
+		function drawGlyph()
+		{
+			var cnv = document.getElementById("maincanvas");  cnv.width = Math.floor(getDPR()*400);  cnv.height = Math.floor(getDPR()*400);
+			scaleCnv(cnv);
+			var ctx = cnv.getContext("2d");
+			ctx.font="20px sans";
+			
+			var scale = 340*getDPR() / font.head.unitsPerEm;
+				
+			var path = Typr.U.glyphToPath(font, gid);
+				
+			cnv.width = cnv.width;
+			ctx.translate(50*getDPR(),320*getDPR());  
+				
+			ctx.fillStyle = "#ff0000";
+			ctx.fillRect(0,0,cnv.width,1);
+			ctx.fillRect(0,-Math.round(font.hhea.ascender *scale),cnv.width,1);
+			ctx.fillRect(0,-Math.round(font.hhea.descender*scale),cnv.width,1);
+			
+			ctx.scale(scale,-scale);
+			
+			ctx.lineWidth = 5/scale;
+			ctx.strokeStyle = "#003377";
+			ctx.fillStyle = "#999999";
+			Typr.U.pathToContext(path, ctx);
+			ctx.fill();
+			ctx.stroke();
+			
+			drawOutline(path, ctx);
+			
+			var props = document.getElementById("properties");
+			
+			var hex = "---", str = "---";
+			var ucode = uncd[gid];
+			if(ucode!=null) {  hex=ucode[0].toString(16);  while(hex.length<4)hex="0"+hex;  str=String.fromCodePoint(ucode[0]);   }
+			
+			props.innerHTML = "Unicode: #"+hex+" <span style=\"font-size:2em; margin-left:1em;\"> "+str+"</span>";
+				
+			var tarea = document.getElementById("textarea");
+			tarea.innerHTML = "{\n\"cmds\" : \n"+JSON.stringify(path.cmds)+",\n\n\"crds\" : \n"+JSON.stringify(path.crds)+"\n}";
+		}
+		function drawWord(e)
+		{
+			var cnv = document.getElementById("wordcanvas");  cnv.width = Math.floor(800*getDPR());  cnv.height = Math.floor(130*getDPR());
+			scaleCnv(cnv);
+			var ctx = cnv.getContext("2d");
+			
+			var scale = 80*getDPR() / font.head.unitsPerEm;
+			
+			var shape = Typr.U.shape(font, document.getElementById("word").value);
+			var path = Typr.U.shapeToPath(font, shape);
+			
+			//var spath = document.getElementById("svgp");  spath.setAttribute("d", Typr.U.pathToSVG(path));
+				
+			cnv.width = cnv.width;
+			ctx.translate(4*getDPR(),100*getDPR());  
+				
+			ctx.fillStyle = "#000000";
+			ctx.fillRect(0,0,cnv.width,1);
+			ctx.fillRect(0,-Math.round(font.hhea.ascender *scale),cnv.width,1);
+			ctx.fillRect(0,-Math.round(font.hhea.descender*scale),cnv.width,1);
+			
+			ctx.scale(scale,-scale);
+			
+			Typr.U.pathToContext(path, ctx);  // setting color and calling fill() already in path
+			ctx.fill();
+		}
+		
+		function drawOutline(path, ctx)
+		{
+			var ci=0, x=0, y=0;
+			var crds = path.crds;
+			var w = 0.0025 * font.head.unitsPerEm;
+			
+			ctx.lineWidth = w;
+			ctx.strokeStyle = "#00ffff";
+			Typr.U.pathToContext(path,ctx);
+			
+			ctx.stroke();
+			
+			var ss = w*4;
+			ctx.fillStyle = "#ff0055";
+			for(var i=0; i<crds.length; i+=2) ctx.fillRect(crds[i]-ss,crds[i+1]-ss,2*ss,2*ss); 
+		}
+		
+		function drawPrev() {  if(off>0) off = off-num;               drawGlyphs();  }
+		function drawNext() {  if(off+num<glyphCnt()) off = off+num;  drawGlyphs();  }
+		function glyphClick(e){ gid = e.target.gid;  drawGlyph(); }
+		function getDPR() { return window["devicePixelRatio"] || 1; }
+		function scaleCnv(cnv) {  cnv.setAttribute("style", "width:"+(cnv.width/getDPR())+"px; height:"+(cnv.height/getDPR())+"px");  }
+	</script> 
+<!-- ///////////// end of Typr.js /////////////-->
+</head>
+
+
+<body onload="go();">
+  <ion-app>
+
+    <ion-tabs>
+      <!-- Define the tab bar with buttons -->
+      <ion-tab-bar slot="bottom">
+        <ion-tab-button tab="tab1">
+          <ion-icon name="home"></ion-icon>
+          <ion-label>Home</ion-label>
+        </ion-tab-button>
+        <ion-tab-button tab="font">
+          <ion-icon name="information-circle"></ion-icon>
+          <ion-label>font</ion-label>
+        </ion-tab-button>
+        <ion-tab-button tab="tab3">
+          <ion-icon name="settings"></ion-icon>
+          <ion-label>Settings</ion-label>
+        </ion-tab-button>
+      </ion-tab-bar>
+
+
+
+            <ion-tab tab="tab1">
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Home
+            <ion-button size="small" id="open-action-sheet">Open</
+</ion-button></ion-title>
+          </ion-toolbar>
+        </ion-header>
+
+<ion-content color="warning" class="ion-padding">
+  
+  <p>
+  cd lonicstenil</p>
+  <p>
+  npm start</p>
+  <style>
+  ion-action-sheet.my-custom-class .action-sheet-group {
+    background: #f58840;
+  }
+
+  ion-action-sheet.my-custom-class .action-sheet-title {
+    color: #fff;
+  }
+
+  ion-action-sheet.my-custom-class .action-sheet-cancel::after {
+    background: #e97223;
+  }
+
+  ion-action-sheet.my-custom-class .action-sheet-button,
+  ion-action-sheet.my-custom-class .action-sheet-button.ion-focused {
+    color: #000000;
+  }
+
+  @media (any-hover: hover) {
+    ion-action-sheet.my-custom-class .action-sheet-button:hover {
+      color: #000000;
+    }
+  }
+
+  ion-action-sheet.my-custom-class ion-backdrop {
+    opacity: 0.6;
+  }
+</style>
+
+
+<ion-action-sheet
+  trigger="open-action-sheet"
+  class="my-custom-class"
+  header="Example header"
+  sub-header="Example subheader"
+></ion-action-sheet>
+
+<script>
+  var actionSheet = document.querySelector('ion-action-sheet');
+
+  actionSheet.buttons = [
+    {
+      text: 'Delete',
+      role: 'destructive',
+      data: {
+        action: 'delete',
+      },
+    },
+    {
+      text: 'Share',
+      data: {
+        action: 'share',
+      },
+    },
+    {
+      text: 'Cancel',
+      role: 'cancel',
+      data: {
+        action: 'cancel',
+      },
+    },
+  ];
+</script>
+
+    </ion-content>
+      </ion-tab>
+<!-- ///////////////////////////////////////// -->      
+<!-- ///////////// страница FONTS /////////////-->
+<!-- ///////////////////////////////////////// -->
+<ion-tab tab="font">
+<ion-content class="ion-padding">
+<!-- ///////////// menu FONTS /////////////////-->
+    <ion-menu side="end" content-id="main-content">
+        <ion-header>
+              <ion-toolbar>
+                  <ion-title>Menu Font
+                  </ion-title>
+              </ion-toolbar>
+        </ion-header>
+                <ion-content class="ion-padding">This is the \\ FONTS \\ menu content.
+                </ion-content>
+     </ion-menu>
+<!-- ///////////////////////////////////////// -->     
+<!-- ///////////// main страницы FONTS ////////-->     
+<div class="ion-page" id="main-content">
+    <ion-header>
+<!-- ////// вверхний тулбар страницы FONTS ////-->
+        <ion-toolbar>
+<!-- ///////////////////////////////////////// -->
+<ion-title>font</ion-title
+<!-- ///// кнопка правого меню шрифта //////// -->                
+            <ion-buttons slot="end">
+                <ion-menu-button></ion-menu-button>
+            </ion-buttons>
+<!-- ///////////////////////////////////////// -->
+        </ion-toolbar>
+    </ion-header>
+<!-- ////  контент страницы шрифтов ////////// -->  
+        <ion-content class="ion-padding"> 
+            <div> %%%%%%/// FONT::name ///%%%%%%
+            </div>
+            <div>
+                <h1>Heading 1</h1>
+                <h2>Heading 2</h2>
+                <h3>Heading 3</h3>
+                <h4>Heading 4</h4>
+                <h5>Heading 5</h5>
+                <h6>Heading 6</h6>
+            </div>
+            <div>    
+                <p>Here's a small text description for the content. Nothing more, nothing less.</p> 
+            </div>
+
+            
+
+
+            
+        </ion-content>
+<!-- ///////////////////////////////////////// --> 
+</div>
+</ion-content>
+</ion-tab>
+<!-- ///////////////////////////////////////// --> 
+<!-- ///////////////////////////////////////// --> 
+<!-- ///////////////////////////////////////// --> 
+<ion-tab tab="tab3">
+<!-- ///////////////////////////////////////// --> 
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Example</ion-title>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <ion-list inset="true">
+            <ion-item>
+              <ion-input label="First Name"></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-input label="Last Name"></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-toggle class="themeToggle">
+                <ion-label>Allow Notifications</ion-label>
+                <ion-note color="medium">Unsubscribe at any time</ion-note>
+              </ion-toggle>
+            </ion-item>
+          </ion-list>
+
+          <ion-list inset="true">
+            <ion-item>
+              <ion-textarea label="Comments" label-placement="floating" rows="5"></ion-textarea>
+            </ion-item>
+          </ion-list>
+
+          <ion-note color="medium" class="ion-margin-horizontal block">
+            Your comments will be kept anonymous and will only be used to improve the reliability of our products.
+          </ion-note>
+        </ion-content>
+      </ion-tab>
+    </ion-tabs>
+  </ion-app>
+</body>
+
+</html>
